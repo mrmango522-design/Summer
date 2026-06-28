@@ -113,6 +113,7 @@
         // 定義低小遊戲清單 (小一至小二)
         const juniorGames = [
             { name: "太空人行李遊戲", path: "space luggage/spaceitems.html" },
+            { name: "太空垃圾捕獲遊戲", path: "spacecatch/spacecatch.html" }, // <-- 新增的低小遊戲
             { name: "實驗記錄表", path: "record.html" } 
         ];
 
@@ -175,7 +176,7 @@
         function loadGame(path, clickedElement) {
             document.getElementById('game-frame').src = path;
 
-            // 切換選單的 active 藍綠色高亮狀態
+            // 切換選單的 active 高亮狀態
             const listItems = document.querySelectorAll('.menu-list li');
             listItems.forEach(li => li.classList.remove('active'));
             if (clickedElement) {
