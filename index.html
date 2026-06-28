@@ -12,21 +12,27 @@
         /* 登入介面樣式 */
         #login-container {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; background-color: #e0f7fa;
+            min-height: 100vh; background-color: #e0f7fa; padding: 20px;
         }
         .login-box {
             background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: 90%; max-width: 400px; text-align: center;
+            width: 100%; max-width: 400px; text-align: center;
         }
-        .login-box h2 { margin-bottom: 20px; color: #00796b; }
+        .login-box .logo {
+            max-width: 150px; height: auto; margin-bottom: 15px;
+        }
+        .login-box h2 { color: #00796b; margin-bottom: 5px; }
+        .login-box .subtitle { color: #555; margin-bottom: 25px; font-size: 1.1em; font-weight: bold; }
+        
         .input-group { margin-bottom: 15px; text-align: left; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .input-group input, .input-group select {
-            width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px;
+        .input-group select, .input-group input {
+            width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px;
         }
         button {
             width: 100%; padding: 12px; background-color: #00796b; color: white;
             border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: 0.3s;
+            margin-top: 10px;
         }
         button:hover { background-color: #004d40; }
 
@@ -62,26 +68,27 @@
 
     <div id="login-container">
         <div class="login-box">
+            <img src="logo.jpg" alt="Logo" class="logo">
+            
             <h2>學生登入</h2>
+            <div class="subtitle">暑期STEM學科小遊戲</div>
+
             <div class="input-group">
-                <label for="grade">年級 (決定低小/高小)</label>
-                <select id="grade">
-                    <option value="">請選擇年級...</option>
-                    <option value="1">小一</option>
-                    <option value="2">小二</option>
-                    <option value="3">小三</option>
-                    <option value="4">小四</option>
-                    <option value="5">小五</option>
-                    <option value="6">小六</option>
+                <label for="student-class">班別</label>
+                <select id="student-class">
+                    <option value="">請選擇班別...</option>
+                    <option value="1A">1A</option>
+                    <option value="2A">2A</option>
+                    <option value="2B">2B</option>
+                    <option value="3A">3A</option>
+                    <option value="4A">4A</option>
+                    <option value="5A">5A</option>
+                    <option value="6A">6A</option>
                 </select>
             </div>
             <div class="input-group">
-                <label for="class-name">班別 (例如: A, B, C)</label>
-                <input type="text" id="class-name" placeholder="輸入班別">
-            </div>
-            <div class="input-group">
                 <label for="student-id">學號</label>
-                <input type="number" id="student-id" placeholder="輸入學號">
+                <input type="number" id="student-id" placeholder="輸入學號 (例如: 12)">
             </div>
             <button onclick="login()">進入平台</button>
         </div>
@@ -91,7 +98,7 @@
         <div id="sidebar">
             <div class="student-info">
                 <h3 id="display-student-info">學生資料</h3>
-                <p id="display-level" style="font-size: 0.9em; color: #80cbc4;"></p>
+                <p id="display-level" style="font-size: 0.9em; color: #80cbc4; margin-top: 5px;"></p>
             </div>
             <ul class="menu-list" id="menu">
                 </ul>
@@ -103,44 +110,44 @@
     </div>
 
     <script>
-        // 定義低小遊戲清單
+        // 定義低小遊戲清單 (小一至小二)
         const juniorGames = [
             { name: "太空人行李遊戲", path: "space luggage/spaceitems.html" },
-            { name: "實驗記錄表", path: "record.html" } // 假設你有一個 record.html
+            { name: "實驗記錄表", path: "record.html" } 
         ];
 
-        // 定義高小遊戲清單
+        // 定義高小遊戲清單 (小三至小六)
         const seniorGames = [
             { name: "天韻載荷艙", path: "photo/photo.html" },
             { name: "無人機派送員", path: "drone/drone.html" },
             { name: "建橋大亨", path: "bridge/bridge.html" },
             { name: "城市電力拯救隊", path: "electricity/electricity.html" },
-            { name: "實驗記錄表", path: "record.html" } // 假設你有一個 record.html
+            { name: "實驗記錄表", path: "record.html" } 
         ];
 
         // 登入邏輯
         function login() {
-            const grade = document.getElementById('grade').value;
-            const className = document.getElementById('class-name').value;
+            const studentClass = document.getElementById('student-class').value;
             const studentId = document.getElementById('student-id').value;
 
-            if (!grade || !className || !studentId) {
-                alert("請填寫完整的年級、班別和學號！");
+            if (!studentClass || !studentId) {
+                alert("請選擇班別並輸入學號！");
                 return;
             }
 
-            // 1. 將資料存入 localStorage，讓遊戲內的 HTML 也能讀取
-            const fullClass = grade + className; // 例如: 1A
-            localStorage.setItem('studentClass', fullClass);
+            // 1. 將資料存入 localStorage，讓後續遊戲內的 HTML 也能讀取
+            localStorage.setItem('studentClass', studentClass);
             localStorage.setItem('studentId', studentId);
 
-            // 2. 判斷低小或高小 (1, 2 為低小，3-6 為高小)
-            const isJunior = (grade === '1' || grade === '2');
+            // 2. 透過班別的第一個字判斷低小或高小 (1 或 2 為低小，3-6 為高小)
+            const gradeLetter = studentClass.charAt(0); 
+            const isJunior = (gradeLetter === '1' || gradeLetter === '2');
+            
             const menuData = isJunior ? juniorGames : seniorGames;
             const levelText = isJunior ? "低小分頁" : "高小分頁";
 
-            // 3. 更新介面文字
-            document.getElementById('display-student-info').innerText = `${fullClass}班 - ${studentId}號`;
+            // 3. 更新介面學生資訊
+            document.getElementById('display-student-info').innerText = `${studentClass} 班 - ${studentId} 號`;
             document.getElementById('display-level').innerText = levelText;
 
             // 4. 生成左側選單
@@ -153,7 +160,7 @@
                 li.onclick = () => loadGame(game.path, li);
                 menuElement.appendChild(li);
 
-                // 預設載入第一個遊戲
+                // 預設自動載入第一個項目
                 if (index === 0) {
                     loadGame(game.path, li);
                 }
@@ -164,24 +171,17 @@
             document.getElementById('dashboard-container').style.display = 'flex';
         }
 
-        // 載入遊戲至 iframe 邏輯
+        // 載入遊戲至 iframe
         function loadGame(path, clickedElement) {
-            // 更新 iframe 的 src
             document.getElementById('game-frame').src = path;
 
-            // 移除所有選單的 active 標籤，並為點擊的項目加上 active
+            // 切換選單的 active 藍綠色高亮狀態
             const listItems = document.querySelectorAll('.menu-list li');
             listItems.forEach(li => li.classList.remove('active'));
             if (clickedElement) {
                 clickedElement.classList.add('active');
             }
         }
-
-        // 檢查是否已登入 (重新整理時免重新輸入)
-        window.onload = function() {
-            // 如果你想讓學生每次重新整理都要登入，可以將這段註解掉
-            // 目前設定是每次進來都要輸入，這樣對小學生換電腦比較直覺
-        };
     </script>
 </body>
 </html>
