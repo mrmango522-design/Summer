@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>無人機城市 3D 座標派送任務</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Three.js 及其控制器 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .input-number { -moz-appearance: textfield; }
+        .input-number::-webkit-outer-spin-button,
+        .input-number::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        /* 確保 Canvas 正確填滿容器 */
+        #canvas-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            outline: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen overflow-hidden text-slate-800">
+
+<div class="flex flex-col md:flex-row h-full max-w-[1600px] mx-auto p-2 md:p-4 gap-4">
+    
+    <!-- 左側控制面板 -->
+    <div class="w-full md:w-1/3 lg:w-1/4 bg-white rounded-2xl shadow-lg flex flex-col h-full overflow-hidden border border-slate-200 z-10 relative">
+        <div class="bg-blue-600 text-white p-4 text-center rounded-t-2xl">
+            <h1 class="text-xl font-bold">🚁 3D無人機派送任務</h1>
+            <p class="text-xs text-blue-100 mt-1">學習 X-Y 平面與立體空間</p>
+        </div>
+
+        <div class="p-4 flex-1 overflow-y-auto custom-scroll flex flex-col gap-4">
+            <!-- 任務說明 -->
+            <div class="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm">
+                <strong>任務說明：</strong><br>
+                觀察右方 3D 地圖，找出 <span class="font-bold">📦 物資</span> 及 <span class="font-bold">🎯 降落點</span> 的座標。<br>
+                橫向紅線為 <b>X 軸</b>，直向藍線為 <b>Y 軸</b>。<br>
+                💡 <i>提示：可用滑鼠左鍵旋轉視角、滾輪縮放。</i>
+            </div>
+
+            <!-- 控制選項 -->
+            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-200">
+                <label class="text-sm font-bold text-slate-700">城市大小:</label>
+                <select id="grid-size-select" class="bg-white border border-slate-300 text-sm rounded px-2 py-1 outline-none focus:border-blue-500">
+                    <option value="5">5 x 5 (初階)</option>
+                    <option value="15" selected>15 x 15 (中階)</option>
+                    <option value="30">30 x 30 (高階)</option>
+                </select>
+            </div>
+            
+            <button onclick="initGame()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg transition-colors text-sm">
+                🔄 重新產生任務
+            </button>
+
+            <!-- 座標輸入區 -->
+            <div id="inputs-container" class="flex flex-col gap-3 mt-2">
+                <!-- 動態注入 -->
+            </div>
+
+            <!-- 訊息提示框 -->
+            <div id="message-box" class="hidden mt-2 p-3 rounded-lg text-sm font-bold text-center animate-pulse">
+                <!-- 動態注入 -->
+            </div>
+        </div>
+
+        <!-- 執行按鈕 -->
+        <div class="p-4 bg-slate-50 border-t border-slate-200 rounded-b-2xl">
+            <button id="execute-btn" onclick="executeMission()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl shadow-md transition-transform transform active:scale-95 text-lg">
+                🚀 執行任務
+            </button>
+        </div>
+    </div>
+
+    <!-- 右側 3D Canvas 區域 -->
+    <div class="w-full md:w-2/3 lg:w-3/4 bg-white rounded-2xl shadow-lg border border-slate-200 flex flex-col relative h-full overflow-hidden">
+        <div class="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-200 shadow-sm z-10 text-sm font-bold text-slate-700">
+            當前指示座標: <span id="hover-coord" class="text-blue-600">(X: -, Y: -)</span>
+        </div>
+        <div class="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-200 shadow-sm z-10 text-sm">
+            🏠 起點 | 📦 運送點 | 🎯 降落點
+        </div>
+        
+        <div class="flex-1 w-full h-full cursor-crosshair" id="canvas-container">
+            <!-- Three.js 將會渲染在這裡 -->
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- UI 元素 ---
+    const container = document.getElementById('canvas-container');
+    const inputsContainer = document.getElementById('inputs-container');
+    const sizeSelect = document.getElementById('grid-size-select');
+    const messageBox = document.getElementById('message-box');
+    const hoverCoord = document.getElementById('hover-coord');
+    const executeBtn = document.getElementById('execute-btn');
+
+    // --- 遊戲邏輯與狀態 ---
+    let gridSize = 15;
+    const CELL_SIZE = 10;
+    
+    let mapHeights = []; // 記錄每格的高度
+    let gamePoints = {
+        start: null,
+        deliveries: [],
+        landing: null
+    };
+    
+    let isAnimating = false;
+    let hoveredCell = null;
+    let animationQueue = [];
+    let currentTarget = null;
+    
+    // --- Three.js 核心變數 ---
+    let scene, camera, renderer, controls;
+    let cityGroup, markersGroup, droneGroup;
+    let highlightMesh;
+    let raycaster, mouse;
+    let invisibleGround; // 用於射線檢測的平滑地面
+    let droneRotors = []; // 用於旋轉動畫
+    
+    // 動畫狀態機
+    let droneState = 'IDLE'; // IDLE, ASCEND, MOVE, DESCEND
+    let safeAltitude = 40;
+    
+    // --- 初始化 Three.js ---
+    function initThree() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color('#e0f2fe'); // 淺藍色天空
+
+        // 相機
+        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 2000);
+        
+        // 渲染器
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // 控制器
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05; // 防止看到地底下
+
+        // 光源
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(100, 200, 100);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 500;
+        dirLight.shadow.camera.left = -200;
+        dirLight.shadow.camera.right = 200;
+        dirLight.shadow.camera.top = 200;
+        dirLight.shadow.camera.bottom = -200;
+        scene.add(dirLight);
+
+        // 群組
+        cityGroup = new THREE.Group();
+        scene.add(cityGroup);
+        markersGroup = new THREE.Group();
+        scene.add(markersGroup);
+
+        // 懸停高亮方塊
+        const hlGeo = new THREE.BoxGeometry(CELL_SIZE, CELL_SIZE * 2, CELL_SIZE);
+        const hlMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, opacity: 0.4, transparent: true, depthWrite: false });
+        highlightMesh = new THREE.Mesh(hlGeo, hlMat);
+        highlightMesh.visible = false;
+        scene.add(highlightMesh);
+
+        // 射線檢測
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+
+        // 建立無人機
+        buildDrone();
+
+        // 事件監聽
+        window.addEventListener('resize', onWindowResize);
+        container.addEventListener('mousemove', onMouseMove);
+        container.addEventListener('mouseleave', () => { highlightMesh.visible = false; hoverCoord.innerText = `(X: -, Y: -)`; });
+
+        // 開始渲染迴圈
+        animateLoop();
+    }
+
+    function onWindowResize() {
+        if(!camera || !renderer) return;
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    // --- 構建無人機 3D 模型 ---
+    function buildDrone() {
+        droneGroup = new THREE.Group();
+        
+        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x334155 }); // 深灰
+        const armMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 }); // 淺灰
+        const rotorMat = new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }); // 半透明紅
+
+        // 主體
+        const body = new THREE.Mesh(new THREE.BoxGeometry(3, 1.5, 3), bodyMat);
+        body.castShadow = true;
+        droneGroup.add(body);
+
+        // 支臂 (X 形)
+        const armGeo = new THREE.BoxGeometry(8, 0.4, 0.4);
+        const arm1 = new THREE.Mesh(armGeo, armMat);
+        arm1.rotation.y = Math.PI / 4;
+        const arm2 = new THREE.Mesh(armGeo, armMat);
+        arm2.rotation.y = -Math.PI / 4;
+        droneGroup.add(arm1, arm2);
+
+        // 螺旋槳
+        const rotorOffsets = [
+            {x: 2.8, z: 2.8}, {x: -2.8, z: 2.8}, 
+            {x: 2.8, z: -2.8}, {x: -2.8, z: -2.8}
+        ];
+        
+        droneRotors = [];
+        rotorOffsets.forEach(pos => {
+            // 馬達座
+            const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.6, 8), bodyMat);
+            motor.position.set(pos.x, 0.2, pos.z);
+            droneGroup.add(motor);
+            
+            // 槳葉
+            const rotor = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.05, 16), rotorMat);
+            rotor.position.set(pos.x, 0.6, pos.z);
+            droneRotors.push(rotor);
+            droneGroup.add(rotor);
+        });
+
+        scene.add(droneGroup);
+    }
+
+    // --- 遊戲初始化與地圖生成 ---
+    function initGame() {
+        if (isAnimating) return;
+        
+        if (!scene) initThree();
+
+        gridSize = parseInt(sizeSelect.value);
+        safeAltitude = gridSize === 5 ? 20 : (gridSize === 15 ? 30 : 40); // 根據地圖動態調整安全飛行高度
+        
+        generateMap3D();
+        generatePoints();
+        generateUI();
+        generateMarkers3D();
+        resetDrone();
+        
+        hideMessage();
+        
+        // 調整相機視角
+        const centerOffset = (gridSize - 1) * CELL_SIZE / 2;
+        const camDistance = gridSize * CELL_SIZE * 1.2;
+        controls.target.set(centerOffset, 0, -centerOffset);
+        camera.position.set(centerOffset, camDistance * 0.8, centerOffset + camDistance * 0.5);
+        controls.update();
+    }
+
+    function generateMap3D() {
+        // 清理舊地圖
+        while(cityGroup.children.length > 0){ 
+            let child = cityGroup.children[0];
+            cityGroup.remove(child);
+            if(child.geometry) child.geometry.dispose();
+            if(child.material) child.material.dispose();
+        }
+
+        mapHeights = [];
+        const roadMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 }); // 道路灰色
+        const buildMatOptions = [
+            new THREE.MeshLambertMaterial({ color: 0xf1f5f9 }), // 白
+            new THREE.MeshLambertMaterial({ color: 0xe2e8f0 }), // 淺灰
+            new THREE.MeshLambertMaterial({ color: 0xbfdbfe }), // 淺藍
+        ];
+
+        // 建立地基平臺
+        const groundGeo = new THREE.BoxGeometry(gridSize * CELL_SIZE + 20, 2, gridSize * CELL_SIZE + 20);
+        const groundMat = new THREE.MeshLambertMaterial({ color: 0x64748b });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.position.set((gridSize-1)*CELL_SIZE/2, -1, -(gridSize-1)*CELL_SIZE/2);
+        ground.receiveShadow = true;
+        cityGroup.add(ground);
+
+        // 用於射線檢測的隱形平面
+        const invGeo = new THREE.PlaneGeometry(gridSize * CELL_SIZE, gridSize * CELL_SIZE);
+        const invMat = new THREE.MeshBasicMaterial({visible: false});
+        invisibleGround = new THREE.Mesh(invGeo, invMat);
+        invisibleGround.rotation.x = -Math.PI / 2;
+        invisibleGround.position.set((gridSize-1)*CELL_SIZE/2, 0, -(gridSize-1)*CELL_SIZE/2);
+        cityGroup.add(invisibleGround);
+
+        for (let x = 1; x <= gridSize; x++) {
+            mapHeights[x] = [];
+            for (let y = 1; y <= gridSize; y++) {
+                let isRoad = (x % 4 === 0) || (y % 4 === 0) || (x === 1) || (y === 1);
+                
+                let h = isRoad ? 0.5 : Math.floor(Math.random() * 15) + 5; 
+                if(gridSize === 5 && !isRoad) h = Math.floor(Math.random() * 8) + 3; // 縮小高度
+
+                mapHeights[x][y] = h;
+
+                const geo = new THREE.BoxGeometry(CELL_SIZE - 1, h, CELL_SIZE - 1);
+                // 決定材質
+                let mat = isRoad ? roadMat : buildMatOptions[Math.floor(Math.random() * buildMatOptions.length)];
+                
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set((x - 1) * CELL_SIZE, h / 2, -(y - 1) * CELL_SIZE);
+                mesh.castShadow = !isRoad;
+                mesh.receiveShadow = true;
+                cityGroup.add(mesh);
+            }
+        }
+
+        drawAxes3D();
+    }
+
+    // 繪製座標軸與標籤
+    function drawAxes3D() {
+        // X 軸 (紅色)
+        const xAxisGeo = new THREE.BoxGeometry(gridSize * CELL_SIZE + 10, 1, 1);
+        const xMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        const xAxis = new THREE.Mesh(xAxisGeo, xMat);
+        xAxis.position.set((gridSize-1)*CELL_SIZE/2, 0.5, CELL_SIZE);
+        cityGroup.add(xAxis);
+
+        // Y 軸 (對應 3D 的 -Z 軸，藍色)
+        const yAxisGeo = new THREE.BoxGeometry(1, 1, gridSize * CELL_SIZE + 10);
+        const yMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6 });
+        const yAxis = new THREE.Mesh(yAxisGeo, yMat);
+        yAxis.position.set(-CELL_SIZE, 0.5, -(gridSize-1)*CELL_SIZE/2);
+        cityGroup.add(yAxis);
+
+        // 添加文字標籤
+        const step = gridSize > 15 ? 5 : (gridSize > 5 ? 2 : 1);
+        for(let i = 1; i <= gridSize; i++){
+            if(i % step === 0 || i === 1 || i === gridSize) {
+                // X 軸數字
+                let spriteX = createTextSprite(i.toString(), '#ef4444');
+                spriteX.position.set((i-1)*CELL_SIZE, 3, CELL_SIZE * 1.5);
+                cityGroup.add(spriteX);
+
+                // Y 軸數字
+                let spriteY = createTextSprite(i.toString(), '#3b82f6');
+                spriteY.position.set(-CELL_SIZE * 1.5, 3, -(i-1)*CELL_SIZE);
+                cityGroup.add(spriteY);
+            }
+        }
+        
+        // 原點
+        let origin = createTextSprite('0', '#334155');
+        origin.position.set(-CELL_SIZE, 3, CELL_SIZE);
+        cityGroup.add(origin);
+    }
+
+    // 文字精靈產生器
+    function createTextSprite(text, color) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = color;
+        ctx.font = 'bold 80px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 64, 64);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(8, 8, 1);
+        return sprite;
+    }
+
+    function createEmojiSprite(emoji) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.font = '80px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // 添加一點陰影效果讓 Emoji 清楚
+        ctx.shadowColor = "rgba(255,255,255,0.8)";
+        ctx.shadowBlur = 10;
+        ctx.fillText(emoji, 64, 64);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(10, 10, 1);
+        return sprite;
+    }
+
+    function generatePoints() {
+        gamePoints.deliveries = [];
+        let allUsedCoords = new Set();
+        
+        function getUniqueRandomPoint() {
+            let x, y, key;
+            do {
+                x = Math.floor(Math.random() * gridSize) + 1;
+                y = Math.floor(Math.random() * gridSize) + 1;
+                key = `${x},${y}`;
+            } while (allUsedCoords.has(key));
+            allUsedCoords.add(key);
+            return { x, y, collected: false, sprite: null };
+        }
+
+        gamePoints.start = getUniqueRandomPoint();
+        
+        let numDeliveries = Math.floor(Math.random() * 5) + 1;
+        if (gridSize === 5) numDeliveries = Math.floor(Math.random() * 3) + 1; 
+
+        for (let i = 0; i < numDeliveries; i++) {
+            gamePoints.deliveries.push(getUniqueRandomPoint());
+        }
+        
+        gamePoints.landing = getUniqueRandomPoint();
+    }
+
+    function generateMarkers3D() {
+        while(markersGroup.children.length > 0){ 
+            markersGroup.remove(markersGroup.children[0]);
+        }
+
+        // 起點
+        let sSprite = createEmojiSprite('🏠');
+        sSprite.position.set( (gamePoints.start.x-1)*CELL_SIZE, mapHeights[gamePoints.start.x][gamePoints.start.y] + 5, -(gamePoints.start.y-1)*CELL_SIZE );
+        markersGroup.add(sSprite);
+
+        // 運送點
+        gamePoints.deliveries.forEach(d => {
+            d.sprite = createEmojiSprite('📦');
+            d.sprite.position.set( (d.x-1)*CELL_SIZE, mapHeights[d.x][d.y] + 5, -(d.y-1)*CELL_SIZE );
+            markersGroup.add(d.sprite);
+        });
+
+        // 降落點
+        let lSprite = createEmojiSprite('🎯');
+        lSprite.position.set( (gamePoints.landing.x-1)*CELL_SIZE, mapHeights[gamePoints.landing.x][gamePoints.landing.y] + 5, -(gamePoints.landing.y-1)*CELL_SIZE );
+        markersGroup.add(lSprite);
+    }
+
+    function resetDrone() {
+        droneState = 'IDLE';
+        let startY = mapHeights[gamePoints.start.x][gamePoints.start.y] + 2; // +2 offset from building top
+        droneGroup.position.set(
+            (gamePoints.start.x-1)*CELL_SIZE,
+            startY,
+            -(gamePoints.start.y-1)*CELL_SIZE
+        );
+        gamePoints.deliveries.forEach(d => {
+            d.collected = false;
+            if(d.sprite) d.sprite.visible = true;
+        });
+    }
+
+    // --- UI 與互動 ---
+    function generateUI() {
+        inputsContainer.innerHTML = '';
+        gamePoints.deliveries.forEach((d, index) => {
+            inputsContainer.appendChild(createCoordinateInputRow(`📦 運送點 ${index + 1}`, `delivery-${index}`));
+        });
+        inputsContainer.appendChild(createCoordinateInputRow(`🎯 最終降落點`, `landing`));
+    }
+
+    function createCoordinateInputRow(label, idPrefix) {
+        const div = document.createElement('div');
+        div.className = "bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex items-center justify-between";
+        div.innerHTML = `
+            <span class="text-sm font-bold text-slate-700 w-24">${label}</span>
+            <div class="flex space-x-2">
+                <div class="flex items-center border border-slate-300 rounded overflow-hidden">
+                    <span class="bg-slate-100 text-xs px-2 py-1.5 text-slate-500 font-bold border-r border-slate-300">X</span>
+                    <input type="number" id="${idPrefix}-x" class="input-number w-10 text-center text-sm py-1 outline-none focus:bg-blue-50" min="1" max="${gridSize}">
+                </div>
+                <div class="flex items-center border border-slate-300 rounded overflow-hidden">
+                    <span class="bg-slate-100 text-xs px-2 py-1.5 text-slate-500 font-bold border-r border-slate-300">Y</span>
+                    <input type="number" id="${idPrefix}-y" class="input-number w-10 text-center text-sm py-1 outline-none focus:bg-blue-50" min="1" max="${gridSize}">
+                </div>
+            </div>
+        `;
+        return div;
+    }
+
+    // 射線滑鼠懸停檢測
+    function onMouseMove(event) {
+        if (!invisibleGround || isAnimating) return;
+        
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(invisibleGround);
+
+        if (intersects.length > 0) {
+            let px = intersects[0].point.x;
+            let pz = intersects[0].point.z;
+            
+            // 將 3D 座標轉回 Grid X, Y
+            let gx = Math.round(px / CELL_SIZE) + 1;
+            let gy = Math.round(-pz / CELL_SIZE) + 1;
+
+            if (gx >= 1 && gx <= gridSize && gy >= 1 && gy <= gridSize) {
+                hoveredCell = {x: gx, y: gy};
+                hoverCoord.innerText = `(X: ${gx}, Y: ${gy})`;
+                
+                // 更新高亮方塊位置與高度
+                let h = mapHeights[gx][gy];
+                highlightMesh.scale.y = h / (CELL_SIZE * 2); 
+                highlightMesh.position.set((gx - 1) * CELL_SIZE, h / 2 + 0.1, -(gy - 1) * CELL_SIZE);
+                highlightMesh.visible = true;
+            } else {
+                highlightMesh.visible = false;
+                hoverCoord.innerText = `(X: -, Y: -)`;
+            }
+        }
+    }
+
+    // --- 動畫與邏輯執行 ---
+    function executeMission() {
+        if (isAnimating) return;
+        
+        let inputsValid = true;
+        let sequence = [];
+        
+        // 讀取運送點輸入
+        for (let i = 0; i < gamePoints.deliveries.length; i++) {
+            const xStr = document.getElementById(`delivery-${i}-x`).value;
+            const yStr = document.getElementById(`delivery-${i}-y`).value;
+            const x = parseInt(xStr);
+            const y = parseInt(yStr);
+            
+            if (isNaN(x) || isNaN(y) || x < 1 || x > gridSize || y < 1 || y > gridSize) {
+                inputsValid = false; break;
+            }
+            sequence.push({ x, y, type: 'delivery' });
+        }
+        
+        // 讀取降落點輸入
+        const lxStr = document.getElementById(`landing-x`).value;
+        const lyStr = document.getElementById(`landing-y`).value;
+        const lx = parseInt(lxStr);
+        const ly = parseInt(lyStr);
+        
+        if (isNaN(lx) || isNaN(ly) || lx < 1 || lx > gridSize || ly < 1 || ly > gridSize) {
+            inputsValid = false;
+        } else {
+            sequence.push({ x: lx, y: ly, type: 'landing' });
+        }
+        
+        if (!inputsValid) {
+            showMessage("請填寫所有欄位，並確保數值在 1 到 " + gridSize + " 之間！", "error");
+            return;
+        }
+
+        // 開始動畫序列
+        resetDrone();
+        animationQueue = sequence;
+        isAnimating = true;
+        executeBtn.disabled = true;
+        executeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        hideMessage();
+        highlightMesh.visible = false;
+        setNextTarget();
+    }
+
+    function setNextTarget() {
+        if (animationQueue.length > 0) {
+            let nextPt = animationQueue.shift();
+            currentTarget = {
+                gx: nextPt.x,
+                gy: nextPt.y,
+                x: (nextPt.x - 1) * CELL_SIZE,
+                y: mapHeights[nextPt.x][nextPt.y] + 2, // 最終降落/懸停高度
+                z: -(nextPt.y - 1) * CELL_SIZE,
+                type: nextPt.type
+            };
+            droneState = 'ASCEND';
+        } else {
+            finishAnimation();
+        }
+    }
+
+    function updateDroneAnimation() {
+        // 旋轉螺旋槳
+        if(droneRotors && droneRotors.length > 0){
+            let speed = (droneState === 'IDLE') ? 0.05 : 0.5; // 飛行時旋轉加快
+            droneRotors.forEach(r => r.rotation.y += speed);
+        }
+
+        if (!isAnimating || !currentTarget) {
+            // 待機時稍微浮動
+            if(!isAnimating && droneGroup) {
+                let time = Date.now() * 0.003;
+                droneGroup.position.y += Math.sin(time) * 0.02;
+            }
+            return;
+        }
+
+        const moveSpeed = 0.5;
+        const ascendSpeed = 0.4;
+
+        if (droneState === 'ASCEND') {
+            if (droneGroup.position.y < safeAltitude) {
+                droneGroup.position.y += ascendSpeed;
+            } else {
+                droneState = 'MOVE';
+                // 轉向目標
+                let targetPos = new THREE.Vector3(currentTarget.x, droneGroup.position.y, currentTarget.z);
+                droneGroup.lookAt(targetPos);
+            }
+        } 
+        else if (droneState === 'MOVE') {
+            const dx = currentTarget.x - droneGroup.position.x;
+            const dz = currentTarget.z - droneGroup.position.z;
+            const dist = Math.sqrt(dx*dx + dz*dz);
+            
+            if (dist < moveSpeed) {
+                droneGroup.position.x = currentTarget.x;
+                droneGroup.position.z = currentTarget.z;
+                droneState = 'DESCEND';
+            } else {
+                droneGroup.position.x += (dx / dist) * moveSpeed;
+                droneGroup.position.z += (dz / dist) * moveSpeed;
+                // 飛行傾斜效果
+                droneGroup.rotation.x = 0.2; // 稍微往前傾
+            }
+        }
+        else if (droneState === 'DESCEND') {
+            droneGroup.rotation.x = 0; // 恢復水平
+            if (droneGroup.position.y > currentTarget.y) {
+                droneGroup.position.y -= ascendSpeed;
+            } else {
+                droneGroup.position.y = currentTarget.y;
+                droneState = 'CHECK';
+                checkWaypoint();
+            }
+        }
+    }
+
+    function checkWaypoint() {
+        let isValid = false;
+        let failMsg = "";
+        let droneGx = currentTarget.gx;
+        let droneGy = currentTarget.gy;
+
+        if (currentTarget.type === 'delivery') {
+            const dIndex = gamePoints.deliveries.findIndex(d => d.x === droneGx && d.y === droneGy && !d.collected);
+            if (dIndex !== -1) {
+                gamePoints.deliveries[dIndex].collected = true;
+                if(gamePoints.deliveries[dIndex].sprite) {
+                    gamePoints.deliveries[dIndex].sprite.visible = false; // 隱藏物資表示已收集
+                }
+                isValid = true;
+            } else {
+                failMsg = `座標(${droneGx}, ${droneGy}) 沒有需要運送的物資，或填寫錯誤。`;
+            }
+        } else if (currentTarget.type === 'landing') {
+            const allCollected = gamePoints.deliveries.every(d => d.collected);
+            if (!allCollected) {
+                failMsg = "尚未完成所有物資派送就嘗試降落！";
+            } else if (droneGx === gamePoints.landing.x && droneGy === gamePoints.landing.y) {
+                isValid = true;
+            } else {
+                failMsg = `座標(${droneGx}, ${droneGy}) 不是正確的降落點！`;
+            }
+        }
+
+        if (!isValid) {
+            showMessage("任務失敗：" + failMsg, "error");
+            isAnimating = false;
+            executeBtn.disabled = false;
+            executeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            droneState = 'IDLE';
+        } else {
+            // 停頓 0.5 秒後前往下一個點
+            setTimeout(() => {
+                setNextTarget();
+            }, 500);
+        }
+    }
+
+    function finishAnimation() {
+        showMessage("🎉 任務成功！無人機已完美降落。", "success");
+        isAnimating = false;
+        executeBtn.disabled = false;
+        executeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        droneState = 'IDLE';
+    }
+
+    function showMessage(text, type) {
+        messageBox.innerText = text;
+        messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+        if (type === 'error') {
+            messageBox.classList.add('bg-red-100', 'text-red-700', 'border', 'border-red-300');
+        } else {
+            messageBox.classList.add('bg-green-100', 'text-green-700', 'border', 'border-green-300');
+        }
+    }
+
+    function hideMessage() {
+        messageBox.classList.add('hidden');
+    }
+
+    // 主渲染迴圈
+    function animateLoop() {
+        requestAnimationFrame(animateLoop);
+        if(controls) controls.update(); // only required if controls.enableDamping or controls.autoRotate are set
+        updateDroneAnimation();
+        
+        // 確保標籤一直朝向相機
+        markersGroup.children.forEach(c => {
+            if(c.isSprite) c.quaternion.copy(camera.quaternion);
+        });
+
+        if(renderer && scene && camera) {
+            renderer.render(scene, camera);
+        }
+    }
+
+    // 頁面載入完成後啟動
+    window.onload = () => {
+        initGame();
+        // 預設選擇中階，觸發一次UI綁定
+        sizeSelect.addEventListener('change', initGame);
+    };
+
+</script>
+</body>
+</html>

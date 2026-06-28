@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拯救停電城市 - 電路工程師</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0f172a;
+            color: white;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        /* 遊戲組件樣式 */
+        .component {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+
+        /* 接點樣式升級：支援正負極顏色與文字 */
+        .terminal {
+            width: 24px;
+            height: 24px;
+            background-color: #94a3b8;
+            border: 3px solid #334155;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: absolute;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 16px;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .terminal:hover, .terminal.active {
+            transform: scale(1.3);
+            border-color: #fff;
+        }
+
+        .term-pos { background-color: #ef4444; border-color: #991b1b; }
+        .term-pos.active, .term-pos:hover { background-color: #f87171; box-shadow: 0 0 12px #ef4444; }
+        
+        .term-neg { background-color: #3b82f6; border-color: #1e3a8a; }
+        .term-neg.active, .term-neg:hover { background-color: #60a5fa; box-shadow: 0 0 12px #3b82f6; }
+        
+        .term-neutral:hover, .term-neutral.active { background-color: #cbd5e1; box-shadow: 0 0 12px #94a3b8; }
+
+        /* 電池樣式 */
+        .battery-body {
+            width: 80px;
+            height: 120px;
+            background: linear-gradient(180deg, #dc2626 50%, #1e293b 50%);
+            border: 4px solid #94a3b8;
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            font-weight: 900;
+            font-size: 24px;
+        }
+        .battery-nipple {
+            width: 30px;
+            height: 10px;
+            background-color: #94a3b8;
+            position: absolute;
+            top: -14px;
+            border-radius: 4px 4px 0 0;
+        }
+
+        /* 燈泡樣式 */
+        .bulb-glass {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 3px solid #cbd5e1;
+            border-radius: 50%;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .bulb-glass.on {
+            background-color: #fef08a;
+            border-color: #facc15;
+            box-shadow: 0 0 30px 10px rgba(250, 204, 21, 0.6);
+        }
+        .bulb-glass.on::after {
+            content: '';
+            position: absolute;
+            top: 15px; left: 15px; right: 15px; bottom: 15px;
+            background: #eab308;
+            border-radius: 50%;
+            filter: blur(5px);
+        }
+        .bulb-base {
+            width: 30px;
+            height: 25px;
+            background: repeating-linear-gradient(180deg, #64748b, #64748b 4px, #475569 4px, #475569 8px);
+            border-radius: 0 0 8px 8px;
+            margin-top: -5px;
+            z-index: 2;
+        }
+
+        /* 開關樣式 */
+        .switch-base {
+            width: 100px;
+            height: 30px;
+            background-color: #334155;
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+            border: 2px solid #475569;
+        }
+        .switch-lever {
+            position: absolute;
+            width: 70px;
+            height: 8px;
+            background-color: #ef4444;
+            top: 9px;
+            left: 15px;
+            transform-origin: left center;
+            transform: rotate(-30deg);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 4px;
+        }
+        .switch-base.closed .switch-lever {
+            transform: rotate(0deg);
+            background-color: #22c55e;
+        }
+
+        /* 城市背景動畫 */
+        .city-window {
+            transition: background-color 1s;
+        }
+        .city-window.lit {
+            background-color: #fef08a;
+            box-shadow: 0 0 10px #facc15;
+        }
+        
+        /* 動畫特效 */
+        @keyframes flashRed {
+            0%, 100% { background-color: #0f172a; }
+            50% { background-color: #450a0a; }
+        }
+        .short-circuit-bg {
+            animation: flashRed 0.8s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="city-bg" class="absolute bottom-0 w-full h-1/3 z-0 flex items-end justify-center space-x-2 opacity-30 px-10 pointer-events-none"></div>
+
+    <div class="absolute top-0 left-0 w-full p-6 z-40 pointer-events-none flex justify-between items-start">
+        <div class="bg-slate-800/80 p-4 rounded-xl backdrop-blur-sm border border-slate-700 pointer-events-auto max-w-md">
+            <h1 id="level-title" class="text-2xl font-bold text-blue-400 mb-2">載入中...</h1>
+            <p id="level-desc" class="text-slate-300 text-sm mb-4 leading-relaxed"></p>
+            <div class="flex space-x-3">
+                <button onclick="checkCircuit()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg flex-1">
+                    ⚡ 啟動電源測試
+                </button>
+                <button onclick="clearWires()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded-lg transition">
+                    ✂️ 剪斷電線
+                </button>
+            </div>
+        </div>
+        
+        <div class="bg-slate-800/80 p-4 rounded-xl backdrop-blur-sm border border-slate-700 pointer-events-auto text-center hidden" id="success-panel">
+            <h2 class="text-xl font-bold text-green-400 mb-2">🎉 測試成功！區域恢復電力</h2>
+            <button onclick="nextLevel()" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-lg font-bold transition w-full">
+                前往下一區 ➔
+            </button>
+        </div>
+    </div>
+
+    <div id="play-area" class="relative w-full h-screen z-10">
+        <canvas id="wire-canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+        <div id="components-container" class="absolute top-0 left-0 w-full h-full pointer-events-none"></div>
+    </div>
+
+    <div id="alert-box" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white p-6 rounded-xl shadow-2xl z-50 hidden text-center max-w-md transition-opacity">
+        <div class="text-4xl mb-2">⚠️</div>
+        <h3 class="text-xl font-bold mb-2">警告：發生短路！</h3>
+        <p class="text-sm text-red-100">電流沒有經過任何燈泡就直接流回電池，這會導致電線過熱引發火災！請重新檢查線路。</p>
+        <button onclick="closeAlert()" class="mt-4 bg-white text-red-600 px-4 py-2 rounded font-bold">我知道了</button>
+    </div>
+
+    <script>
+        // --- 關卡數據定義 ---
+        const levels = [
+            {
+                id: 1,
+                title: "第一區：基本照明 (認識極性)",
+                desc: "現代城市採用 LED 燈泡，它們有嚴格的**正負極之分**！<br>請將電池的紅色 (+) 極連接到燈泡的紅色 (+) 極，藍色 (-) 極接到藍色 (-) 極。",
+                comps: [
+                    { id: 'bat1', type: 'battery', x: '30%', y: '50%' },
+                    { id: 'bulb1', type: 'bulb', x: '70%', y: '50%' }
+                ],
+                goal: { pathCount: 1, bulbsPerPath: 1 } 
+            },
+            {
+                id: 2,
+                title: "第二區：短路危機 (知識篇)",
+                desc: "警告！上一手工程師亂接線，直接把電池的正負極連起來了！這叫做<strong class='text-red-400'>短路 (Short Circuit)</strong>，會引發火災！<br>👉 請先點擊「✂️ 剪斷電線」解除危機，然後重新正確接上燈泡。",
+                comps: [
+                    { id: 'bat1', type: 'battery', x: '30%', y: '50%' },
+                    { id: 'bulb1', type: 'bulb', x: '70%', y: '50%' }
+                ],
+                preWires: [
+                    { from: 'term-bat1-pos', to: 'term-bat1-neg' } // 預設製造短路
+                ],
+                goal: { pathCount: 1, bulbsPerPath: 1 } 
+            },
+            {
+                id: 3,
+                title: "第三區：節能控制 (加入開關)",
+                desc: "請將開關加入電路中。開關沒有正負極之分，你可以把它接在電池與燈泡之間任何一段電線上。",
+                comps: [
+                    { id: 'bat1', type: 'battery', x: '20%', y: '50%' },
+                    { id: 'sw1', type: 'switch', x: '50%', y: '70%' },
+                    { id: 'bulb1', type: 'bulb', x: '80%', y: '50%' }
+                ],
+                goal: { pathCount: 1, bulbsPerPath: 1, requireSwitch: true }
+            },
+            {
+                id: 4,
+                title: "第四區：長廊照明 (串聯電路)",
+                desc: "請將兩盞燈**頭尾相連**（串聯）。<br>⚠️ 注意極性：電流要從第一盞燈的 (-) 極，流向下一個燈泡的 (+) 極！",
+                comps: [
+                    { id: 'bat1', type: 'battery', x: '20%', y: '50%' },
+                    { id: 'bulb1', type: 'bulb', x: '50%', y: '30%' },
+                    { id: 'bulb2', type: 'bulb', x: '80%', y: '60%' }
+                ],
+                goal: { pathCount: 1, bulbsPerPath: 2 }
+            },
+            {
+                id: 5,
+                title: "第五區：雙房照明 (並聯電路)",
+                desc: "兩個房間的燈需要各自獨立。請將兩盞燈的 (+) 極都接到電池的 (+) 極，(-) 極都接到 (-) 極（並聯）。",
+                comps: [
+                    { id: 'bat1', type: 'battery', x: '20%', y: '50%' },
+                    { id: 'bulb1', type: 'bulb', x: '60%', y: '30%' },
+                    { id: 'bulb2', type: 'bulb', x: '60%', y: '70%' }
+                ],
+                goal: { pathCount: 2, bulbsPerPath: 1 }
+            },
+            {
+                id: 6,
+                title: "第六區：工程師的最終考驗",
+                desc: "請建立一個包含**兩盞並聯燈泡**的電路，並在**總線路上**安裝一個開關，讓開關能同時控制兩盞燈。小心不要短路及接反極性！",
+                comps: [
+                    { id: 'bat1', type: 'battery', x: '20%', y: '50%' },
+                    { id: 'sw1', type: 'switch', x: '45%', y: '50%' },
+                    { id: 'bulb1', type: 'bulb', x: '75%', y: '25%' },
+                    { id: 'bulb2', type: 'bulb', x: '75%', y: '75%' }
+                ],
+                goal: { pathCount: 2, bulbsPerPath: 1, requireSwitch: true }
+            }
+        ];
+
+        let currentLevelIndex = 0;
+        let wires = [];       
+        let components = [];  
+        
+        const canvas = document.getElementById('wire-canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let startTerminal = null;
+        let mousePos = { x: 0, y: 0 };
+        let terminalCoords = {}; 
+
+        // --- 初始化系統 ---
+        function initGame() {
+            window.addEventListener('resize', handleResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('touchmove', onTouchMove, {passive: false});
+            window.addEventListener('mouseup', onMouseUp);
+            window.addEventListener('touchend', onMouseUp);
+
+            generateCity();
+            loadLevel(currentLevelIndex);
+        }
+
+        function handleResize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            updateTerminalCoords();
+            drawWires();
+        }
+
+        function loadLevel(index) {
+            if (index >= levels.length) {
+                alert("恭喜你！成功拯救了整個城市的電力系統！你是最棒的電路工程師！");
+                currentLevelIndex = 0;
+                index = 0;
+            }
+            
+            const level = levels[index];
+            document.getElementById('level-title').innerText = level.title;
+            document.getElementById('level-desc').innerHTML = level.desc;
+            document.getElementById('success-panel').classList.add('hidden');
+            document.body.classList.remove('short-circuit-bg');
+            
+            // 如果關卡有預設電線 (如短路關卡)，則載入
+            wires = level.preWires ? JSON.parse(JSON.stringify(level.preWires)) : [];
+            components = JSON.parse(JSON.stringify(level.comps)); 
+            
+            components.forEach(c => {
+                if (c.type === 'switch') c.closed = false;
+                if (c.type === 'bulb') c.isOn = false;
+            });
+
+            renderComponents();
+            handleResize(); 
+
+            // 如果有預設電線，執行一次靜默檢查以觸發警告視覺
+            if (wires.length > 0) {
+                checkCircuit(false);
+            }
+        }
+
+        // --- 渲染 DOM 組件 ---
+        function renderComponents() {
+            const container = document.getElementById('components-container');
+            container.innerHTML = '';
+            terminalCoords = {};
+
+            components.forEach(comp => {
+                const el = document.createElement('div');
+                el.className = 'component pointer-events-auto';
+                el.style.left = comp.x;
+                el.style.top = comp.y;
+                el.id = `comp-${comp.id}`;
+
+                let innerHTML = '';
+                
+                if (comp.type === 'battery') {
+                    innerHTML = `
+                        <div class="battery-nipple"></div>
+                        <div class="battery-body text-red-400"></div>
+                        <div class="terminal term-pos" id="term-${comp.id}-pos" style="top: -24px;">+</div>
+                        <div class="terminal term-neg" id="term-${comp.id}-neg" style="bottom: -24px;">-</div>
+                    `;
+                } 
+                else if (comp.type === 'bulb') {
+                    innerHTML = `
+                        <div class="bulb-glass ${comp.isOn ? 'on' : ''}" id="glass-${comp.id}"></div>
+                        <div class="bulb-base"></div>
+                        <div class="terminal term-pos" id="term-${comp.id}-pos" style="bottom: -15px; left: -10px;">+</div>
+                        <div class="terminal term-neg" id="term-${comp.id}-neg" style="bottom: -15px; right: -10px;">-</div>
+                    `;
+                }
+                else if (comp.type === 'switch') {
+                    innerHTML = `
+                        <div class="switch-base ${comp.closed ? 'closed' : ''}" onclick="toggleSwitch('${comp.id}')">
+                            <div class="switch-lever"></div>
+                        </div>
+                        <div class="terminal term-neutral" id="term-${comp.id}-t1" style="top: 50%; left: -12px; transform: translateY(-50%);"></div>
+                        <div class="terminal term-neutral" id="term-${comp.id}-t2" style="top: 50%; right: -12px; transform: translateY(-50%);"></div>
+                    `;
+                }
+
+                el.innerHTML = innerHTML;
+                container.appendChild(el);
+
+                const terminals = el.querySelectorAll('.terminal');
+                terminals.forEach(t => {
+                    t.addEventListener('mousedown', (e) => onTerminalDown(e, t.id));
+                    t.addEventListener('touchstart', (e) => onTerminalDown(e, t.id), {passive: false});
+                    t.addEventListener('mouseenter', () => t.classList.add('active'));
+                    t.addEventListener('mouseleave', () => t.classList.remove('active'));
+                });
+            });
+        }
+
+        function updateTerminalCoords() {
+            terminalCoords = {};
+            const terminals = document.querySelectorAll('.terminal');
+            terminals.forEach(t => {
+                const rect = t.getBoundingClientRect();
+                terminalCoords[t.id] = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
+            });
+        }
+
+        function toggleSwitch(id) {
+            const comp = components.find(c => c.id === id);
+            if (comp) {
+                comp.closed = !comp.closed;
+                renderComponents(); 
+                updateTerminalCoords();
+                checkCircuit(false); 
+            }
+        }
+
+        // --- 互動畫線系統 ---
+        function onTerminalDown(e, termId) {
+            e.preventDefault(); 
+            isDrawing = true;
+            startTerminal = termId;
+            updateMousePos(e);
+            drawWires();
+        }
+
+        function updateMousePos(e) {
+            if (e.touches && e.touches.length > 0) {
+                mousePos.x = e.touches[0].clientX;
+                mousePos.y = e.touches[0].clientY;
+            } else if (e.clientX !== undefined) {
+                mousePos.x = e.clientX;
+                mousePos.y = e.clientY;
+            }
+        }
+
+        function onMouseMove(e) {
+            if (!isDrawing) return;
+            updateMousePos(e);
+            drawWires();
+        }
+
+        function onTouchMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            updateMousePos(e);
+            drawWires();
+        }
+
+        function onMouseUp(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            let endTerminal = null;
+
+            if (e.target && e.target.classList.contains('terminal')) {
+                endTerminal = e.target.id;
+            } else {
+                let clientX = mousePos.x;
+                let clientY = mousePos.y;
+                
+                if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                    clientY = e.changedTouches[0].clientY;
+                }
+                
+                canvas.style.pointerEvents = 'none'; 
+                const elemBelow = document.elementFromPoint(clientX, clientY);
+                canvas.style.pointerEvents = 'auto';
+
+                if (elemBelow && elemBelow.classList.contains('terminal')) {
+                    endTerminal = elemBelow.id;
+                }
+            }
+
+            if (endTerminal) {
+                const startCompId = startTerminal.split('-')[1];
+                const endCompId = endTerminal.split('-')[1];
+                
+                if (startTerminal !== endTerminal && startCompId !== endCompId) {
+                    const exists = wires.some(w => 
+                        (w.from === startTerminal && w.to === endTerminal) ||
+                        (w.from === endTerminal && w.to === startTerminal)
+                    );
+                    if (!exists) {
+                        wires.push({ from: startTerminal, to: endTerminal });
+                    }
+                }
+            }
+            
+            drawWires();
+            checkCircuit(false); 
+        }
+
+        function clearWires() {
+            wires = [];
+            components.forEach(c => { if(c.type === 'bulb') c.isOn = false; });
+            renderComponents();
+            updateTerminalCoords(); // 修復：重新渲染組件後，必須重新抓取接點的最新座標
+            drawWires();
+            document.body.classList.remove('short-circuit-bg');
+            document.getElementById('success-panel').classList.add('hidden');
+            turnOffCity();
+        }
+
+        function drawWires() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            wires.forEach(wire => {
+                const p1 = terminalCoords[wire.from];
+                const p2 = terminalCoords[wire.to];
+                if(p1 && p2) drawCurvedWire(p1, p2, '#e2e8f0'); // 改為灰色電線更寫實
+            });
+
+            if (isDrawing && startTerminal) {
+                const p1 = terminalCoords[startTerminal];
+                drawCurvedWire(p1, mousePos, '#fbbf24'); 
+            }
+        }
+
+        function drawCurvedWire(p1, p2, color) {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            
+            let midX = (p1.x + p2.x) / 2;
+            let midY = (p1.y + p2.y) / 2;
+            
+            const dx = p2.x - p1.x;
+            
+            // 修復：如果電線幾乎是垂直的（例如接在同一個電池的上下極），我們讓它向旁邊大幅度彎曲，避免被電池身體擋住
+            if (Math.abs(dx) < 30) {
+                midX += 80; // 強制向右彎曲，凸顯出來
+            } else {
+                midY += Math.abs(dx) * 0.2; // 正常的自然下垂
+            }
+            
+            ctx.quadraticCurveTo(midX, midY, p2.x, p2.y);
+            
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 4;
+            
+            ctx.strokeStyle = color;
+            ctx.stroke();
+            ctx.shadowColor = 'transparent'; 
+        }
+
+        // --- 核心：加入極性判斷的電路模擬 ---
+        function checkCircuit(showSuccessUI = true) {
+            const graph = {};
+            const getTId = (compId, postfix) => `term-${compId}-${postfix}`;
+
+            // 初始化節點與內部連線
+            components.forEach(c => {
+                if (c.type === 'battery') {
+                    graph[getTId(c.id, 'pos')] = [];
+                    graph[getTId(c.id, 'neg')] = [];
+                } else if (c.type === 'bulb') {
+                    const pos = getTId(c.id, 'pos');
+                    const neg = getTId(c.id, 'neg');
+                    graph[pos] = [];
+                    graph[neg] = [];
+                    // 標記 internal: true，用來在分析時判斷方向
+                    graph[pos].push({ to: neg, compId: c.id, internal: true });
+                    graph[neg].push({ to: pos, compId: c.id, internal: true });
+                } else if (c.type === 'switch') {
+                    const t1 = getTId(c.id, 't1');
+                    const t2 = getTId(c.id, 't2');
+                    graph[t1] = [];
+                    graph[t2] = [];
+                    if (c.closed) {
+                        graph[t1].push({ to: t2, compId: c.id, internal: true });
+                        graph[t2].push({ to: t1, compId: c.id, internal: true });
+                    }
+                }
+            });
+
+            // 加入外部電線
+            wires.forEach(w => {
+                if(graph[w.from] && graph[w.to]) {
+                    graph[w.from].push({ to: w.to, compId: 'wire' });
+                    graph[w.to].push({ to: w.from, compId: 'wire' });
+                }
+            });
+
+            // DFS 尋找路徑
+            const bat = components.find(c => c.type === 'battery');
+            const startNode = getTId(bat.id, 'pos');
+            const endNode = getTId(bat.id, 'neg');
+            let allPaths = [];
+            
+            function dfs(currentNode, visitedNodes, currentPath) {
+                if (currentNode === endNode) {
+                    allPaths.push([...currentPath]);
+                    return;
+                }
+                for (let edge of graph[currentNode]) {
+                    if (!visitedNodes.has(edge.to)) {
+                        visitedNodes.add(edge.to);
+                        currentPath.push(edge);
+                        dfs(edge.to, visitedNodes, currentPath);
+                        currentPath.pop();
+                        visitedNodes.delete(edge.to);
+                    }
+                }
+            }
+
+            dfs(startNode, new Set([startNode]), []);
+
+            // 分析路徑與極性
+            let isShortCircuit = false;
+            let validPathCount = 0;
+            let bulbsPerPathCount = [];
+            let switchInPath = false;
+            let bulbStatus = {}; // 記錄燈泡是否成功通電
+            let hasReversedBulb = false; // 記錄是否有接反的現象
+
+            allPaths.forEach(path => {
+                let loadCount = 0; 
+                let pathBulbs = [];
+                let hasSwitch = false;
+                let pathBlocked = false; // 因極性接反而阻斷電流
+
+                path.forEach(edge => {
+                    const comp = components.find(c => c.id === edge.compId);
+                    if (comp && comp.type === 'bulb' && edge.internal) {
+                        loadCount++;
+                        // 判斷電流方向：從 pos 進入，目的地會是 neg
+                        if (edge.to.endsWith('-neg')) { 
+                            pathBulbs.push({ id: comp.id, correct: true });
+                        } else {
+                            // 接反了！
+                            pathBulbs.push({ id: comp.id, correct: false });
+                            pathBlocked = true; 
+                        }
+                    }
+                    if (comp && comp.type === 'switch' && edge.internal) {
+                        hasSwitch = true;
+                    }
+                });
+
+                if (loadCount === 0) {
+                    isShortCircuit = true; // 沒有負載，短路！
+                } else if (!pathBlocked) {
+                    // 路徑正常且極性正確
+                    validPathCount++;
+                    bulbsPerPathCount.push(loadCount);
+                    pathBulbs.forEach(b => {
+                        if (!bulbStatus[b.id]) bulbStatus[b.id] = { correct: false };
+                        if (b.correct) bulbStatus[b.id].correct = true;
+                    });
+                    if (hasSwitch) switchInPath = true;
+                } else {
+                    // 有負載但極性接反，阻斷了這條路徑的電流
+                    hasReversedBulb = true;
+                    pathBulbs.forEach(b => {
+                        if (!bulbStatus[b.id]) bulbStatus[b.id] = { correct: false };
+                    });
+                }
+            });
+
+            // 更新畫面狀態
+            components.forEach(c => {
+                if (c.type === 'bulb') {
+                    const status = bulbStatus[c.id];
+                    c.isOn = !isShortCircuit && status && status.correct;
+                    const glass = document.getElementById(`glass-${c.id}`);
+                    if (glass) {
+                        if (c.isOn) {
+                            glass.classList.add('on');
+                            const maxBulbsInLine = Math.max(...bulbsPerPathCount, 1);
+                            glass.style.opacity = maxBulbsInLine > 1 ? 0.7 : 1; 
+                        } else {
+                            glass.classList.remove('on');
+                            glass.style.opacity = 1;
+                        }
+                    }
+                }
+            });
+
+            // 短路視覺處理
+            if (isShortCircuit && allPaths.length > 0) {
+                document.body.classList.add('short-circuit-bg');
+                if (showSuccessUI) {
+                    document.getElementById('alert-box').classList.remove('hidden');
+                }
+                turnOffCity();
+                return;
+            } else {
+                document.body.classList.remove('short-circuit-bg');
+            }
+
+            // 驗證過關條件與錯誤提示
+            if (showSuccessUI && !isShortCircuit) {
+                const goal = levels[currentLevelIndex].goal;
+                
+                const hasCorrectPaths = validPathCount === goal.pathCount;
+                const hasCorrectBulbs = bulbsPerPathCount.every(count => count === goal.bulbsPerPath) && bulbsPerPathCount.length > 0;
+                const meetsSwitchReq = goal.requireSwitch ? switchInPath : true;
+
+                if (hasCorrectPaths && hasCorrectBulbs && meetsSwitchReq) {
+                    document.getElementById('success-panel').classList.remove('hidden');
+                    turnOnCity();
+                } else {
+                    if (hasReversedBulb) {
+                        alert("線路接反了！具有正負極的元件（如LED燈泡）必須讓電流從(+)極流入，(-)極流出，否則無法導通。");
+                    } else if (validPathCount > 0) {
+                        alert("燈泡亮了！但這不是區政府要求的接線方式（請仔細看任務說明，例如是否需要串聯或並聯）。");
+                    } else if (allPaths.length > 0) {
+                        alert("線路不完整或沒有形成正確的迴圈！");
+                    }
+                }
+            }
+        }
+
+        // --- UI 與 背景互動 ---
+        function closeAlert() {
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        function nextLevel() {
+            currentLevelIndex++;
+            loadLevel(currentLevelIndex);
+        }
+
+        function generateCity() {
+            const city = document.getElementById('city-bg');
+            city.innerHTML = '';
+            const buildingCount = 10;
+            for(let i=0; i<buildingCount; i++) {
+                const width = 40 + Math.random() * 40;
+                const height = 100 + Math.random() * 150;
+                const b = document.createElement('div');
+                b.className = 'bg-slate-800 border-t border-l border-r border-slate-700 relative flex flex-wrap justify-center p-2 pt-4 gap-2 overflow-hidden';
+                b.style.width = `${width}px`;
+                b.style.height = `${height}px`;
+                
+                const rows = Math.floor(height / 25);
+                for(let r=0; r<rows; r++) {
+                    const w = document.createElement('div');
+                    w.className = 'city-window w-3 h-4 bg-slate-900 rounded-sm';
+                    b.appendChild(w);
+                }
+                city.appendChild(b);
+            }
+        }
+
+        function turnOnCity() {
+            const windows = document.querySelectorAll('.city-window');
+            windows.forEach(w => {
+                if (Math.random() > 0.3) { 
+                    setTimeout(() => w.classList.add('lit'), Math.random() * 1000);
+                }
+            });
+            document.getElementById('city-bg').style.opacity = '1';
+        }
+
+        function turnOffCity() {
+            const windows = document.querySelectorAll('.city-window');
+            windows.forEach(w => w.classList.remove('lit'));
+            document.getElementById('city-bg').style.opacity = '0.3';
+        }
+
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
