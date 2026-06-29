@@ -18,9 +18,7 @@
             background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             width: 100%; max-width: 400px; text-align: center;
         }
-        .login-box .logo {
-            max-width: 150px; height: auto; margin-bottom: 15px;
-        }
+        .login-box .logo { max-width: 150px; height: auto; margin-bottom: 15px; }
         .login-box h2 { color: #00796b; margin-bottom: 5px; }
         .login-box .subtitle { color: #555; margin-bottom: 25px; font-size: 1.1em; font-weight: bold; }
         
@@ -44,11 +42,20 @@
             width: 250px; background-color: #263238; color: white; display: flex; flex-direction: column;
         }
         .student-info { padding: 20px; background-color: #1a2327; text-align: center; }
-        .menu-list { flex-grow: 1; overflow-y: auto; list-style-type: none; }
-        .menu-list li {
-            padding: 15px 20px; border-bottom: 1px solid #37474f; cursor: pointer; transition: 0.2s;
+        .menu-list { flex-grow: 1; overflow-y: auto; list-style-type: none; padding-bottom: 20px; }
+        
+        /* 選單分類標題樣式 */
+        .menu-section {
+            padding: 15px 20px 5px 20px; font-size: 0.9em; font-weight: bold; color: #80cbc4; 
+            text-transform: uppercase; border-bottom: 1px solid #37474f; margin-top: 10px;
         }
-        .menu-list li:hover, .menu-list li.active { background-color: #00796b; }
+        
+        /* 選單可點擊項目樣式 */
+        .menu-item {
+            padding: 12px 20px 12px 30px; /* 左側增加 padding 產生縮排感 */
+            cursor: pointer; transition: 0.2s; font-size: 0.95em;
+        }
+        .menu-item:hover, .menu-item.active { background-color: #00796b; border-left: 4px solid #b2dfdb; padding-left: 26px; }
         
         /* 右側內容區 */
         #content-area { flex-grow: 1; display: flex; flex-direction: column; }
@@ -58,9 +65,11 @@
         @media (max-width: 768px) {
             #dashboard-container { flex-direction: column; }
             #sidebar { width: 100%; height: auto; flex-direction: column; }
-            .menu-list { display: flex; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; }
-            .menu-list li { border-bottom: none; border-right: 1px solid #37474f; flex: 0 0 auto; }
-            #content-area { height: calc(100vh - 120px); } /* 扣除頂部選單高度 */
+            .menu-list { display: flex; flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; padding-bottom: 0; }
+            .menu-section { border-bottom: none; border-right: 1px solid #37474f; padding: 15px; margin-top: 0; }
+            .menu-item { border-right: 1px solid #37474f; padding: 15px; }
+            .menu-item:hover, .menu-item.active { border-left: none; border-bottom: 4px solid #b2dfdb; padding-left: 15px; }
+            #content-area { height: calc(100vh - 120px); }
         }
     </style>
 </head>
@@ -69,7 +78,6 @@
     <div id="login-container">
         <div class="login-box">
             <img src="logo.jpg" alt="Logo" class="logo">
-            
             <h2>學生登入</h2>
             <div class="subtitle">暑期STEM學科小遊戲</div>
 
@@ -110,20 +118,44 @@
     </div>
 
     <script>
-        // 定義低小遊戲清單 (小一至小二)
-        const juniorGames = [
-            { name: "太空人行李遊戲", path: "space luggage/spaceitems.html" },
-            { name: "太空垃圾捕獲遊戲", path: "spacecatch/spacecatch.html" }, // <-- 新增的低小遊戲
-            { name: "實驗記錄表", path: "record.html" } 
+        // 定義低小雙層目錄結構 (小一至小二)
+        const juniorMenu = [
+            {
+                sectionName: "神奇走馬燈",
+                items: [
+                    { name: "1. 知識講解", path: "Videos/Video1.mp4" },
+                    { name: "2. 硬件組裝及簡易測試", path: "Videos/Video2.mp4" },
+                    { name: "3. 實驗記錄", path: "record.html" }
+                ]
+            },
+            {
+                sectionName: "STEM 小遊戲",
+                items: [
+                    { name: "太空人行李遊戲", path: "space luggage/spaceitems.html" },
+                    { name: "太空垃圾捕獲遊戲", path: "spacecatch/spacecatch.html" }
+                ]
+            }
         ];
 
-        // 定義高小遊戲清單 (小三至小六)
-        const seniorGames = [
-            { name: "天韻載荷艙", path: "photo/photo.html" },
-            { name: "無人機派送員", path: "drone/drone.html" },
-            { name: "建橋大亨", path: "bridge/bridge.html" },
-            { name: "城市電力拯救隊", path: "electricity/electricity.html" },
-            { name: "實驗記錄表", path: "record.html" } 
+        // 定義高小雙層目錄結構 (小三至小六)
+        const seniorMenu = [
+            {
+                sectionName: "神奇走馬燈",
+                items: [
+                    { name: "1. 知識講解", path: "Videos/Video3.mp4" }, // <-- 已更新為 Video3.mp4
+                    { name: "2. 硬件組裝及簡易測試", path: "Videos/Video4.mp4" },
+                    { name: "3. 實驗記錄", path: "record.html" }
+                ]
+            },
+            {
+                sectionName: "STEM 小遊戲",
+                items: [
+                    { name: "天韻載荷艙", path: "photo/photo.html" },
+                    { name: "無人機派送員", path: "drone/drone.html" },
+                    { name: "建橋大亨", path: "bridge/bridge.html" },
+                    { name: "城市電力拯救隊", path: "electricity/electricity.html" }
+                ]
+            }
         ];
 
         // 登入邏輯
@@ -136,48 +168,57 @@
                 return;
             }
 
-            // 1. 將資料存入 localStorage，讓後續遊戲內的 HTML 也能讀取
             localStorage.setItem('studentClass', studentClass);
             localStorage.setItem('studentId', studentId);
 
-            // 2. 透過班別的第一個字判斷低小或高小 (1 或 2 為低小，3-6 為高小)
             const gradeLetter = studentClass.charAt(0); 
             const isJunior = (gradeLetter === '1' || gradeLetter === '2');
             
-            const menuData = isJunior ? juniorGames : seniorGames;
+            const menuData = isJunior ? juniorMenu : seniorMenu;
             const levelText = isJunior ? "低小分頁" : "高小分頁";
 
-            // 3. 更新介面學生資訊
             document.getElementById('display-student-info').innerText = `${studentClass} 班 - ${studentId} 號`;
             document.getElementById('display-level').innerText = levelText;
 
-            // 4. 生成左側選單
             const menuElement = document.getElementById('menu');
-            menuElement.innerHTML = ""; // 清空現有選單
+            menuElement.innerHTML = ""; 
             
-            menuData.forEach((game, index) => {
-                const li = document.createElement('li');
-                li.innerText = game.name;
-                li.onclick = () => loadGame(game.path, li);
-                menuElement.appendChild(li);
+            let isFirstItem = true;
 
-                // 預設自動載入第一個項目
-                if (index === 0) {
-                    loadGame(game.path, li);
-                }
+            // 生成雙層選單
+            menuData.forEach(section => {
+                // 1. 生成分類標題 (不可點擊)
+                const sectionLi = document.createElement('li');
+                sectionLi.className = 'menu-section';
+                sectionLi.innerText = section.sectionName;
+                menuElement.appendChild(sectionLi);
+
+                // 2. 生成分類下的項目 (可點擊)
+                section.items.forEach(item => {
+                    const itemLi = document.createElement('li');
+                    itemLi.className = 'menu-item';
+                    itemLi.innerText = item.name;
+                    itemLi.onclick = () => loadGame(item.path, itemLi);
+                    menuElement.appendChild(itemLi);
+
+                    // 預設自動載入第一個項目 (知識講解)
+                    if (isFirstItem) {
+                        loadGame(item.path, itemLi);
+                        isFirstItem = false;
+                    }
+                });
             });
 
-            // 5. 切換畫面：隱藏登入區，顯示主面板
             document.getElementById('login-container').style.display = 'none';
             document.getElementById('dashboard-container').style.display = 'flex';
         }
 
-        // 載入遊戲至 iframe
+        // 載入項目至 iframe
         function loadGame(path, clickedElement) {
             document.getElementById('game-frame').src = path;
 
-            // 切換選單的 active 高亮狀態
-            const listItems = document.querySelectorAll('.menu-list li');
+            // 切換選單的高亮狀態 (只針對 menu-item)
+            const listItems = document.querySelectorAll('.menu-item');
             listItems.forEach(li => li.classList.remove('active'));
             if (clickedElement) {
                 clickedElement.classList.add('active');
