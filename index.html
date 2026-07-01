@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 加入這行，專門解決 YouTube Error 153 來源阻擋問題 -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>學生遊戲與實驗平台</title>
     <style>
         /* 基本樣式重置 */
@@ -52,7 +54,7 @@
         
         /* 選單可點擊項目樣式 */
         .menu-item {
-            padding: 12px 20px 12px 30px; /* 左側增加 padding 產生縮排感 */
+            padding: 12px 20px 12px 30px; 
             cursor: pointer; transition: 0.2s; font-size: 0.95em;
         }
         .menu-item:hover, .menu-item.active { background-color: #00796b; border-left: 4px solid #b2dfdb; padding-left: 26px; }
@@ -75,6 +77,7 @@
 </head>
 <body>
 
+    <!-- 登入區塊 -->
     <div id="login-container">
         <div class="login-box">
             <img src="logo.jpg" alt="Logo" class="logo">
@@ -102,6 +105,7 @@
         </div>
     </div>
 
+    <!-- 主介面區塊 -->
     <div id="dashboard-container">
         <div id="sidebar">
             <div class="student-info">
@@ -109,22 +113,24 @@
                 <p id="display-level" style="font-size: 0.9em; color: #80cbc4; margin-top: 5px;"></p>
             </div>
             <ul class="menu-list" id="menu">
-                </ul>
+                <!-- 選單項目會透過 JavaScript 動態生成 -->
+            </ul>
         </div>
         
         <div id="content-area">
-            <iframe id="game-frame" src="about:blank"></iframe>
+            <!-- iframe 加入了 referrerpolicy，強制傳送正確的安全來源給 YouTube -->
+            <iframe id="game-frame" src="about:blank" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
         </div>
     </div>
 
     <script>
-        // 定義低小雙層目錄結構 (小一至小二)
+        // 定義低小雙層目錄結構 (小一至小二) - 已轉用 youtube-nocookie 域名
         const juniorMenu = [
             {
                 sectionName: "神奇走馬燈",
                 items: [
-                    { name: "1. 知識講解", path: "Videos/Video1.mp4" },
-                    { name: "2. 硬件組裝及簡易測試", path: "Videos/Video2.mp4" },
+                    { name: "1. 知識講解", path: "https://www.youtube-nocookie.com/embed/e7RZTl4iI6o" },
+                    { name: "2. 硬件組裝及簡易測試", path: "https://www.youtube-nocookie.com/embed/ZTWK4cFAgas" },
                     { name: "3. 實驗記錄", path: "record.html" }
                 ]
             },
@@ -137,13 +143,13 @@
             }
         ];
 
-        // 定義高小雙層目錄結構 (小三至小六)
+        // 定義高小雙層目錄結構 (小三至小六) - 已轉用 youtube-nocookie 域名
         const seniorMenu = [
             {
-                sectionName: "神奇走馬燈",
+                sectionName: "冰壺發射器",
                 items: [
-                    { name: "1. 知識講解", path: "Videos/Video3.mp4" }, // <-- 已更新為 Video3.mp4
-                    { name: "2. 硬件組裝及簡易測試", path: "Videos/Video4.mp4" },
+                    { name: "1. 知識講解", path: "https://www.youtube-nocookie.com/embed/kJ9adbwzGLI" }, 
+                    { name: "2. 硬件組裝及簡易測試", path: "https://www.youtube-nocookie.com/embed/SQaF9UKLIbg" },
                     { name: "3. 實驗記錄", path: "record.html" }
                 ]
             },
@@ -187,13 +193,11 @@
 
             // 生成雙層選單
             menuData.forEach(section => {
-                // 1. 生成分類標題 (不可點擊)
                 const sectionLi = document.createElement('li');
                 sectionLi.className = 'menu-section';
                 sectionLi.innerText = section.sectionName;
                 menuElement.appendChild(sectionLi);
 
-                // 2. 生成分類下的項目 (可點擊)
                 section.items.forEach(item => {
                     const itemLi = document.createElement('li');
                     itemLi.className = 'menu-item';
@@ -201,7 +205,6 @@
                     itemLi.onclick = () => loadGame(item.path, itemLi);
                     menuElement.appendChild(itemLi);
 
-                    // 預設自動載入第一個項目 (知識講解)
                     if (isFirstItem) {
                         loadGame(item.path, itemLi);
                         isFirstItem = false;
@@ -213,11 +216,10 @@
             document.getElementById('dashboard-container').style.display = 'flex';
         }
 
-        // 載入項目至 iframe
+        // 載入項目至 iframe (恢復網內直接播放)
         function loadGame(path, clickedElement) {
             document.getElementById('game-frame').src = path;
 
-            // 切換選單的高亮狀態 (只針對 menu-item)
             const listItems = document.querySelectorAll('.menu-item');
             listItems.forEach(li => li.classList.remove('active'));
             if (clickedElement) {
